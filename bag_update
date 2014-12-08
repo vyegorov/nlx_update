@@ -1,0 +1,236 @@
+#!/bin/ksh
+#
+# This job should be run by pgjob
+#
+set -o nounset
+
+# Expect first parameter to be the name of the PID file
+SELFPIDFILE=$1; shift
+echo $$ > "${SELFPIDFILE}"; sync
+
+A_SELF=${0##*/}
+A_DEBUG="no"
+A_SEND="yes"
+BAG_DIR=${PG_BASE}/var/bag
+TMP_DIR=${PG_BASE}/tmp/dir$$.tmp
+PSQL_RC=${PG_BASE}/tmp/psql$$.ret
+LOCK_FILE=${PG_BASE}/tmp/${A_SELF}_is_running
+LOG_DIR=${PG_BASE}/tmp/
+NLX_BIN="/opt/postgres/nlx/rel/bag/bin/bag-extract.sh"
+
+# Setup for tests
+if [ 1 -eq 1 ]; then
+    LOG_DIR=${PG_BASE}/tmp/
+    NLX_BIN="/Users/viy/prj/ecofys/nlx/bag/bin/bag-extract.sh"
+fi
+
+while [ "$#" -gt 0 ]; do
+    case ${1} in
+        log=*)
+            A_DEBUG="${1##*=}"
+            ;;
+        nosend)
+            unset A_SEND
+            ;;
+        *) echo "! Ignoring parameter \"$1\"";;
+    esac
+    shift
+done
+
+for cmd in psql wget unzip bzip2 zip pgsql2shp shp2pgsql ogr2ogr; do
+    type $cmd 2>&1 > /dev/null; RET=$?
+    [ $RET -ne 0 ] && { echo "\"$cmd\" not found, terinating..."; exit 240; }
+done
+
+# Check another job is not active
+if [ -e ${LOCK_FILE} ]; then
+    echo "Another $0 ($(cat ${LOCK_FILE})) ongoing, terminating"
+    return 0
+fi
+# unlock in cleanup() handler
+echo $$ > $LOCK_FILE
+
+# {{{ job_abort(), cleanup()
+job_abort()
+{
+    SIGNUM=${1:-"TERM"}
+    echo "${0##*/}: Signalled ${SIGNUM}, aborting"; sync
+
+    [ ${WAITINGON} -gt 0 ] && { echo "${0##*/}: killing ${WAITINGON} (${WAITINGNAME})"; sync; kill -s $SIGNUM ${WAITINGON}; }
+
+    echo "Failing out"; sync
+    rm -f ${LOCK_FILE}
+    rm -f ${PSQL_RC}
+
+    trap - HUP INT QUIT ABRT ALRM TERM
+    kill $$
+
+    exit 222
+}
+cleanup()
+{
+    rm -f $LOCK_FILE
+    rm -f ${PSQL_RC}
+}
+# }}}
+# dosql() {{{
+dosql()
+{
+    VERBOSITY=terse
+    [ ${A_DEBUG} = "DEBUG" ] && { echo ">>> $1" 1>&2; VERBOSITY=verbose; }
+
+    psql --no-align --quiet --tuples-only --no-psqlrc --single-transaction \
+    -U nlx_update kadaster <<EOSQL &
+\set AUTOCOMMIT on
+\set ON_ERROR_STOP on
+\set VERBOSITY ${VERBOSITY}
+\timing off
+
+$1
+EOSQL
+    WAITINGON=$!; WAITINGNAME=psql
+    wait $WAITINGON
+    RET=$?
+    echo ${RET} > ${PSQL_RC}
+    return ${RET}
+}
+# }}}
+# set_bag() {{{
+set_bag()
+{
+    [ ${A_DEBUG} = "DEBUG" ] && echo ">>> $1"
+    OFS=$IFS
+    IFS=!
+    set -A BAG $1
+    export IFS=$OFS
+
+    set -o allexport
+    BAG_ID="${BAG[0]}"
+    BAG_URL="${BAG[1]}"
+    BAG_STATUS="${BAG[2]}"
+    set +o allexport
+}
+# }}}
+
+trap "job_abort HUP" HUP
+trap "job_abort INT" INT
+trap "job_abort QUIT" QUIT
+trap "job_abort ABRT" ABRT
+trap "job_abort ALRM" ALRM
+trap "job_abort TERM" TERM
+trap "cleanup" EXIT
+
+RETCODE=0
+WAITINGON=0
+
+OFS=${IFS}
+IFS='
+'
+# {{{
+for BAG_ALL in $( dosql "SELECT file_id::text||'!'||update_url||'!'||file_status FROM file WHERE file_status IN ('Registered','Downloaded') ORDER BY modify_dt,downloaded_name LIMIT 1"|sed -e 's/^[ ]*//' )
+do
+    IFS=${OFS}
+    set_bag "${BAG_ALL}"
+
+    echo
+    echo "Processing URL ${BAG_URL} (file_id=${BAG_ID})"
+
+    mkdir -p ${BAG_DIR}/deltas ${BAG_DIR}/dumps
+    cd ${BAG_DIR}
+
+    # {{{ download
+    if [ "${BAG_STATUS}" = "Registered" ]; then
+        #wget --content-disposition -N -q -t 5 -T 30 ${BAG_URL} &
+        curl -J -O ${BAG_URL} &
+        WAITINGON=$!; WAITINGNAME=curl
+        wait $WAITINGON
+        RET=$?
+
+        if [ $RET -eq 0 ]; then
+            BAG_FILE=$(ls -1t DNLDLXAM02-*|head -n 1)
+            echo
+            echo "... \"${BAG_FILE}\" downloaded"
+
+            dosql "UPDATE file SET modify_dt=now(),file_status='Downloaded',downloaded_name='${BAG_FILE}' WHERE file_id=${BAG_ID}" 2>&1 > /dev/null
+        else
+            echo "  > download failed, terminating"
+        fi
+    else
+        BAG_FILE=$( dosql "SELECT downloaded_name FROM file WHERE file_id=${BAG_ID}"|sed -e 's/^[ ]*//' )
+        echo "... \"${BAG_FILE}\" already here, processing"
+        RET=0
+    fi
+    # }}}
+
+    #break # skip file processing, should be done manually for a while
+    # {{{ NLExtract
+    if [ $RET -eq 0 ]; then
+        BAG_LOG="$(date +%Y%m%d.%H%M)-${BAG_ID}.log"
+        mkdir -p ${TMP_DIR}
+        cd ${TMP_DIR}
+        unzip ${BAG_DIR}/${BAG_FILE}
+        cd ${BAG_DIR}
+        echo "... initiating NLExtract-or"
+        ${NLX_BIN} -v -e ${TMP_DIR} > ${LOG_DIR}/${BAG_LOG} 2>&1 &
+        WAITINGON=$!; WAITINGNAME=bagextract.py
+        wait $WAITINGON
+        RET=$?
+    fi
+    # }}}
+    # {{{ vaccumdb and pg_dump
+    if [ $RET -eq 0 ]; then
+        rm -rf ${TMP_DIR}
+        mv ${BAG_FILE} deltas/
+        dosql "UPDATE file SET modify_dt=now(),file_status='Updated',log_file_name='${BAG_LOG}' WHERE file_id=${BAG_ID}"
+        echo "... NLExtract is done, vacuuming"
+        vacuumdb -e -z kadaster 2>&1
+        echo "... vacuumed, dumping"
+        pg_dump -Fc -n nlx_bag -n nlx_update -Ox kadaster -f dumps/"$(date +%Y%m%d.%H%M)-${BAG_ID}-dups.pgdump"
+    else
+        echo "  > update failed (check \`${BAG_LOG}\`), terminating"
+    fi
+    # }}}
+    # {{{ de-duplicate
+    if [ $RET -eq 0 ]; then
+        echo "... dumped, de-duplicating"
+        dosql "SET work_mem TO '50MB'; SELECT '  + removed '||bag_deduplicate(${BAG_ID})||' duplicates';"
+        RET=$?
+    fi
+    # }}}
+    # {{{ refresh dependent tables
+    if [ $RET -eq 0 ]; then
+        echo "... de-duplicated, re-creation of \`gemeente\` and \`adres\` tables"
+        ${NLX_BIN} -q ${NLX_BIN%/*}/../db/script/gemeente-provincie-tabel.sql > /dev/null
+        ${NLX_BIN} -q ${NLX_BIN%/*}/../db/script/adres-tabel.sql > /dev/null
+        ${NLX_BIN} -q ${NLX_BIN%/*}/../db/script/geocode/geocode-tabellen.sql > /dev/null
+        ${NLX_BIN} -q ${NLX_BIN%/*}/../db/script/geocode/geocode-functies.sql > /dev/null
+        vacuumdb -e -z kadaster 2>&1
+        echo "... re-created, another dump"
+        pg_dump -Fc -n nlx_bag -n nlx_update -Ox kadaster -f dumps/"$(date +%Y%m%d.%H%M)-${BAG_ID}-de_duplicated.pgdump"
+    fi
+    # }}}
+
+    if [ $RET -gt 0 ]; then
+        if [ "${BAG_LOG:-x}" = "x" ]; then
+            BAG_LOG="NULL"
+        else
+            BAG_LOG="'${BAG_LOG}'"
+        fi
+        dosql "UPDATE file SET modify_dt=now(), file_status='Error',log_file_name=${BAG_LOG} WHERE file_id=${BAG_ID}" 2>&1 > /dev/null
+    else
+        echo "BAG loaded."
+    fi
+
+    [ "${A_SEND:-no}" = "yes" ] && RETCODE=3
+    [ ${RET} -gt 0 ] && ((RETCODE=${RETCODE}+100))
+
+    return ${RETCODE}
+done
+# }}}
+
+return ${RETCODE}
+
+
+#
+# vim:ts=4 sw=4 et ai
+# vim:foldmethod=marker foldcolumn=0 foldenable
