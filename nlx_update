@@ -161,7 +161,6 @@ do
     fi
     # }}}
 
-    #break # skip file processing, should be done manually for a while
     # {{{ NLExtract
     if [ $RET -eq 0 ]; then
         BAG_LOG="$(date +%Y%m%d.%H%M)-${BAG_ID}.log"

@@ -136,10 +136,10 @@ if (!$PANIC) {
             else
                 $urls .= "<tr>";
 
-            $urls .= "<td>".$row[1]."</td><td><span title='".$row[0]."'>...".substr($row[0], -39)."</span></td>";
+            $urls .= "<td>".$row[1]."</td><td><span title='".$row[0]."'>".(strlen($row[0])>=39?"...":"").substr($row[0], -39)."</span></td>";
             $urls .= "<td>".$row[4]."</td><td>".$row[3]."</td><td>".$row[2]."</td><td>";
-            if (strcmp($row[2], "Updated") == 0) {
-                $urls .= "<a href='".$row[6]."/log' title='".$row[5]."'>".substr($row[5], 0, 20).(strlen($row[5])>=20?"...":"")."</a>";
+            if (strlen($row[5]) > 0) {
+                $urls .= "<a href='".$row[6]."/log' title='".$row[5]."'>".substr($row[5], 0, 22).(strlen($row[5])>=22?"...":"")."</a>";
             }
             $urls .= "</td></tr>\n";
         }
