@@ -54,13 +54,13 @@ $DIR_LOGS="/var/www/public/logs/";
 $FAILURE=0;
 $HIGHLIGHT="-1";
 $db_stmt = array(
-    "bag.ins" => "INSERT INTO nlx_update(file_type,update_url) VALUES ('BAG',$1)",
+    "bag.ins" => "INSERT INTO file(file_type,update_url) VALUES ('BAG',$1)",
     "all.sel" => "SELECT update_url, file_type, file_status,
                          to_char(modify_dt, 'DD-Mon/YYYY HH24:MI') modify_dt,
                          downloaded_name, log_file_name
-                    FROM nlx_update WHERE file_status != 'Archived' ORDER BY nlx_update.modify_dt DESC LIMIT 100",
-    "url.sel" => "SELECT update_url FROM nlx_update WHERE update_url=$1 AND file_status != 'Archived'",
-    "old.upd" => "UPDATE nlx_update SET file_status = 'Archived' WHERE now() - modify_dt > '3 years'::interval AND file_status != 'Archived'"
+                    FROM file WHERE file_status != 'Archived' ORDER BY nlx_update.modify_dt DESC LIMIT 100",
+    "url.sel" => "SELECT update_url FROM file WHERE update_url=$1 AND file_status != 'Archived'",
+    "old.upd" => "UPDATE file SET file_status = 'Archived' WHERE now() - modify_dt > '3 years'::interval AND file_status != 'Archived'"
 );
 $MSG_TYPE="error";
 
