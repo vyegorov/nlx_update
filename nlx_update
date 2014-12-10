@@ -79,8 +79,7 @@ dosql()
     VERBOSITY=terse
     [ ${A_DEBUG} = "DEBUG" ] && { echo ">>> $1" 1>&2; VERBOSITY=verbose; }
 
-    psql --no-align --quiet --tuples-only --no-psqlrc --single-transaction \
-    -U nlx_update kadaster <<EOSQL &
+    psql --no-align --quiet --tuples-only --no-psqlrc --single-transaction <<EOSQL &
 \set AUTOCOMMIT on
 \set ON_ERROR_STOP on
 \set VERBOSITY ${VERBOSITY}
