@@ -65,7 +65,7 @@ ALTER SEQUENCE file_id OWNED BY file.file_id;
 ALTER TABLE file ADD CONSTRAINT c_file_downloaded
     CHECK ((NOT file_status IN ('Downloaded','Updated'))
         OR (file_status IN ('Downloaded', 'Updated') AND downloaded_name IS NOT NULL));
-ALTER TABLE file ADD CONSTRAINT c_fil_updated
+ALTER TABLE file ADD CONSTRAINT c_file_updated
     CHECK ((NOT file_status = 'Updated')
         OR (file_status='Updated' AND log_file_name IS NOT NULL));
 CREATE TABLE file_track (
