@@ -58,7 +58,7 @@ $db_stmt = array(
     "all.sel" => "SELECT update_url, file_type, file_status,
                          to_char(modify_dt, 'DD-Mon/YYYY HH24:MI') modify_dt,
                          downloaded_name, log_file_name
-                    FROM file WHERE file_status != 'Archived' ORDER BY nlx_update.modify_dt DESC LIMIT 100",
+                    FROM file WHERE file_status != 'Archived' ORDER BY file.modify_dt DESC LIMIT 100",
     "url.sel" => "SELECT update_url FROM file WHERE update_url=$1 AND file_status != 'Archived'",
     "old.upd" => "UPDATE file SET file_status = 'Archived' WHERE now() - modify_dt > '3 years'::interval AND file_status != 'Archived'"
 );

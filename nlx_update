@@ -19,7 +19,7 @@ LOG_DIR=${PG_BASE}/tmp/
 NLX_BIN="/opt/postgres/nlx/rel/bag/bin/bag-extract.sh"
 
 # Setup for tests
-if [ 1 -eq 1 ]; then
+if [ 1 -eq 0 ]; then
     LOG_DIR=${PG_BASE}/tmp/
     NLX_BIN="/Users/viy/prj/ecofys/nlx/bag/bin/bag-extract.sh"
 fi
