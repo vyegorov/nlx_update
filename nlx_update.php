@@ -50,7 +50,7 @@ ini_set("memory_limit","1024M");
 date_default_timezone_set("GMT");
 
 $MAX_SIZE=64*1024;
-$DIR_LOGS="/var/www/ecofysdb/public_html/GIS/logs/";
+$DIR_LOGS="/var/www/public/logs/";
 $FAILURE=0;
 $HIGHLIGHT="-1";
 $db_stmt = array(
@@ -64,7 +64,7 @@ $db_stmt = array(
 );
 $MSG_TYPE="error";
 
-if (($db_conn = pg_connect("host=/tmp dbname=kadaster user=nlx_update password=nlx_update")) === FALSE) {
+if (($db_conn = pg_connect("dbname=kadaster user=nlx_update password=nlx_update")) === FALSE) {
     $MSG_TEXT="Cannot connect to the database.";
     $FAILURE=1;
 } else {
