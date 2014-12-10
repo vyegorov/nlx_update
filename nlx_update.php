@@ -57,7 +57,7 @@ $db_stmt = array(
     "bag.ins" => "INSERT INTO file(file_type,update_url) VALUES ('BAG',$1)",
     "all.sel" => "SELECT update_url, file_type, file_status,
                          to_char(modify_dt, 'DD-Mon/YYYY HH24:MI') modify_dt,
-                         downloaded_name, log_file_name
+                         downloaded_name, log_file_name, file_id
                     FROM file WHERE file_status != 'Archived' ORDER BY file.modify_dt DESC LIMIT 100",
     "url.sel" => "SELECT update_url FROM file WHERE update_url=$1 AND file_status != 'Archived'",
     "old.upd" => "UPDATE file SET file_status = 'Archived' WHERE now() - modify_dt > '3 years'::interval AND file_status != 'Archived'"
@@ -137,8 +137,11 @@ if (!$PANIC) {
                 $urls .= "<tr>";
 
             $urls .= "<td>".$row[1]."</td><td><span title='".$row[0]."'>...".substr($row[0], -39)."</span></td>";
-            $urls .= "<td>".$row[4]."</td><td>".$row[3]."</td><td>".$row[2]."</td>";
-            $urls .= "<td><a href='$uri/logs/".$row[5]."' title='".$row[5]."'>".substr($row[5], 0, 20).(strlen($row[5])>=20?"...":"")."</a></td></tr>";
+            $urls .= "<td>".$row[4]."</td><td>".$row[3]."</td><td>".$row[2]."</td><td>";
+            if (strcmp($row[2], "Updated") == 0) {
+                $urls .= "<a href='".$row[6]."/log' title='".$row[5]."'>".substr($row[5], 0, 20).(strlen($row[5])>=20?"...":"")."</a>";
+            }
+            $urls .= "</td></tr>\n";
         }
     } else {
         $MSG_TEXT="<table><tr><td>Cannot generate list of BAG Update URLs:</td></tr>".
