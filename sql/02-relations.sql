@@ -56,6 +56,7 @@ CREATE TABLE bag_stats (
     table_name                  text        NOT NULL,
     row_count                   int8        NOT NULL,
     max_gid                     int8        NOT NULL,
+    dup_count                   int8,       /* can be NULL, 2-step process */
     CONSTRAINT p_bag_stats PRIMARY KEY (file_id, table_name),
     CONSTRAINT f_bag_stats_file FOREIGN KEY (file_id) REFERENCES file
 );

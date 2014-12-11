@@ -96,10 +96,15 @@ BEGIN
         IF in_verbose THEN
             RAISE NOTICE '  .oO( Processing `%`', _rec.table_name;
         END IF;
+        /*  Get max_gid of the previous entry for the table, this
+         *  makes search for the duplicates faster as we scan only
+         *  newly added entries
+         */
         EXECUTE format($$SELECT coalesce(max_gid, def) gid FROM (SELECT 0 def) f
   LEFT JOIN bag_stats ON table_name=%L AND file_id=($1 - 1)$$, _rec.table_name)
            INTO _gid USING in_file;
 
+        /*  De-duplication query  */
         _sql := format($$WITH dups AS (
     SELECT %s,
            max(gid) gid
@@ -148,6 +153,11 @@ SELECT $2, %L, del.gid, %s,
         _ttl := _ttl + _run;
         _sql := regexp_replace(_sql, E'[\\n\\r]+', ' ', 'g');
         RAISE DEBUG '  .oO( SQL: %', _sql;
+
+        /*  Save duplicate count */
+        UPDATE bag_stats SET
+               dup_count = _run
+         WHERE file_id=in_file AND table_name=_rec.table_name;
 
     END LOOP;
 

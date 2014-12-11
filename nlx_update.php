@@ -57,7 +57,8 @@ $db_stmt = array(
     "bag.ins" => "INSERT INTO file(file_type,update_url) VALUES ('BAG',$1)",
     "all.sel" => "SELECT update_url, file_type, file_status,
                          to_char(modify_dt, 'DD-Mon/YYYY HH24:MI') modify_dt,
-                         downloaded_name, log_file_name, file_id
+                         downloaded_name, log_file_name, file_id,
+                         coalesce((SELECT sum(dup_count) FROM bag_stats WHERE file_id=file.file_id), 0) dups
                     FROM file WHERE file_status != 'Archived' ORDER BY file.modify_dt DESC LIMIT 100",
     "url.sel" => "SELECT update_url FROM file WHERE update_url=$1 AND file_status != 'Archived'",
     "old.upd" => "UPDATE file SET file_status = 'Archived' WHERE now() - modify_dt > '3 years'::interval AND file_status != 'Archived'"
@@ -137,9 +138,9 @@ if (!$PANIC) {
                 $urls .= "<tr>";
 
             $urls .= "<td>".$row[1]."</td><td><span title='".$row[0]."'>".(strlen($row[0])>=39?"...":"").substr($row[0], -39)."</span></td>";
-            $urls .= "<td>".$row[4]."</td><td>".$row[3]."</td><td>".$row[2]."</td><td>";
+            $urls .= "<td>".$row[4]."</td><td>".$row[3]."</td><td>".$row[2]."</td><td>".$row[7]."</td><td>";
             if (strlen($row[5]) > 0) {
-                $urls .= "<a href='".$row[6]."/log' title='".$row[5]."'>".substr($row[5], 0, 22).(strlen($row[5])>=22?"...":"")."</a>";
+                $urls .= "<a href='".$row[6]."/log' title='".$row[5]."'>".substr($row[5], 0, 22).(strlen($row[5])>22?"...":"")."</a>";
             }
             $urls .= "</td></tr>\n";
         }
@@ -161,7 +162,7 @@ if (!empty($MSG_TEXT)) {
 }
 
 echo "<div class='info'><table class='urls'>
-<tr><th>Type</th><th>Update URL</th><th>Downloaded name</th><th>Modified (GMT)</th><th>Status</th><th>Log</th></tr>
+<tr><th>Type</th><th>Update URL</th><th>Downloaded name</th><th>Modified (GMT)</th><th>Status</th><th>Duplicates</th><th>Log</th></tr>
 $urls</table></div>";
 
 ?>
