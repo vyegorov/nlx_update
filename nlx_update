@@ -185,7 +185,7 @@ do
         echo "... vacuumed, dumping"
         pg_dump -Fc -n nlx_bag -n nlx_update -Ox kadaster -f dumps/"$(date +%Y%m%d.%H%M)-${BAG_ID}-dups.pgdump"
     else
-        echo "  > update failed (check \`${BAG_LOG}\`), terminating"
+        echo "  > update failed (check \`${BAG_LOG:-output}\`), terminating"
     fi
     # }}}
     # {{{ de-duplicate
