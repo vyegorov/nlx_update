@@ -11,6 +11,7 @@ echo $$ > "${SELFPIDFILE}"; sync
 A_SELF=${0##*/}
 A_DEBUG="no"
 A_SEND="yes"
+A_GEMEENTE="yes"
 BAG_DIR=${PG_BASE}/var/bag
 TMP_DIR=${PG_BASE}/tmp/dir$$.tmp
 PSQL_RC=${PG_BASE}/tmp/psql$$.ret
@@ -27,11 +28,11 @@ fi
 while [ "$#" -gt 0 ]; do
     case ${1} in
         log=*)
-            A_DEBUG="${1##*=}"
-            ;;
+            A_DEBUG="${1##*=}" ;;
         nosend)
-            unset A_SEND
-            ;;
+            unset A_SEND ;;
+        nogemeente)
+            unset A_GEMEENTE ;;
         *) echo "! Ignoring parameter \"$1\"";;
     esac
     shift
@@ -89,9 +90,9 @@ $1
 EOSQL
     WAITINGON=$!; WAITINGNAME=psql
     wait $WAITINGON
-    RET=$?
-    echo ${RET} > ${PSQL_RC}
-    return ${RET}
+    DOSQL_RET=$?
+    echo ${DOSQL_RET} > ${PSQL_RC}
+    return ${DOSQL_RET}
 }
 # }}}
 # set_bag() {{{
@@ -180,23 +181,21 @@ do
         rm -rf ${TMP_DIR}
         mv ${BAG_FILE} deltas/
         dosql "UPDATE file SET modify_dt=now(),file_status='Updated',log_file_name='${BAG_LOG}' WHERE file_id=${BAG_ID}"
-        echo "... NLExtract is done, vacuuming"
-        vacuumdb -e -z kadaster 2>&1
-        echo "... vacuumed, dumping"
+        echo "... NLExtract is done, dumping"
         pg_dump -Fc -n nlx_bag -n nlx_update -Ox kadaster -f dumps/"$(date +%Y%m%d.%H%M)-${BAG_ID}-dups.pgdump"
     else
-        echo "  > update failed (check \`${BAG_LOG:-output}\`), terminating"
+        echo "  > update failed (check \`${BAG_LOG:-above}\`), terminating"
     fi
     # }}}
     # {{{ de-duplicate
     if [ $RET -eq 0 ]; then
         echo "... dumped, de-duplicating"
-        dosql "SET work_mem TO '50MB'; SELECT '  + removed '||bag_deduplicate(${BAG_ID})||' duplicates';"
+        dosql "SET work_mem TO '150MB'; SELECT '  + removed '||bag_deduplicate(${BAG_ID})||' duplicates';"
         RET=$?
     fi
     # }}}
     # {{{ refresh dependent tables
-    if [ $RET -eq 0 ]; then
+    if [ $RET -eq 0 ] && [ "${A_GEMEENTE:-no}" = "yes"]; then
         echo "... de-duplicated, re-creation of \`gemeente\` and \`adres\` tables"
         ${NLX_BIN} -q ${NLX_BIN%/*}/../db/script/gemeente-provincie-tabel.sql > /dev/null
         ${NLX_BIN} -q ${NLX_BIN%/*}/../db/script/adres-tabel.sql > /dev/null
