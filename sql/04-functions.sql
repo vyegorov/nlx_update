@@ -91,12 +91,18 @@ DECLARE
     _gid    int;
 
 BEGIN
+    /*
+     *  Explicitly call `bag_stats` to make sure there're statistics
+     *  for the given file. If there are already, should be quick one
+     */
+    PERFORM bag_stats(in_file);
     FOR _rec IN SELECT * FROM affected_tables_v
     LOOP
         IF in_verbose THEN
             RAISE NOTICE '  .oO( Processing `%`', _rec.table_name;
         END IF;
-        /*  Get max_gid of the previous entry for the table, this
+        /*
+         *  Get max_gid of the previous entry for the table, this
          *  makes search for the duplicates faster as we scan only
          *  newly added entries
          */
