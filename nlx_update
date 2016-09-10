@@ -16,13 +16,14 @@ BAG_DIR=${PG_BASE}/var/bag
 TMP_DIR=${PG_BASE}/tmp/dir$$.tmp
 PSQL_RC=${PG_BASE}/tmp/psql$$.ret
 LOCK_FILE=${PG_BASE}/tmp/${A_SELF}_is_running
-LOG_DIR=${PG_BASE}/tmp/
+LOG_DIR=${PG_BASE}/tmp
 NLX_BIN="/opt/postgres/nlx/rel/bag/bin/bag-extract.sh"
 
 # Setup for tests
 if [ 1 -eq 0 ]; then
     LOG_DIR=${PG_BASE}/tmp/
     NLX_BIN="/Users/viy/prj/ecofys/nlx/bag/bin/bag-extract.sh"
+    unset A_GEMEENTE
 fi
 
 while [ "$#" -gt 0 ]; do
@@ -123,6 +124,8 @@ trap "cleanup" EXIT
 RETCODE=0
 WAITINGON=0
 
+PGCONN="dbname=kadaster"
+
 OFS=${IFS}
 IFS='
 '
@@ -162,14 +165,19 @@ do
     fi
     # }}}
 
-    # {{{ NLExtract
+    # {{{ Unpacking
     if [ $RET -eq 0 ]; then
         BAG_LOG="$(date +%Y%m%d.%H%M)-${BAG_ID}.log"
         mkdir -p ${TMP_DIR}
         cd ${TMP_DIR}
         unzip ${BAG_DIR}/${BAG_FILE}
+        RET=$?
+    fi
+    # }}}
+    # {{{ NLExtract
+    if [ $RET -eq 0 ]; then
         cd ${BAG_DIR}
-        echo "... initiating NLExtract-or"
+        echo "... initiating NLExtract-or (details in ${LOG_DIR}/${BAG_LOG})"
         ${NLX_BIN} -v -e ${TMP_DIR} > ${LOG_DIR}/${BAG_LOG} 2>&1 &
         WAITINGON=$!; WAITINGNAME=bagextract.py
         wait $WAITINGON
@@ -182,7 +190,7 @@ do
         mv ${BAG_FILE} deltas/
         dosql "UPDATE file SET modify_dt=now(),file_status='Updated',log_file_name='${BAG_LOG}' WHERE file_id=${BAG_ID}"
         echo "... NLExtract is done, dumping"
-        pg_dump -Fc -n nlx_bag -n nlx_update -Ox kadaster -f dumps/"$(date +%Y%m%d.%H%M)-${BAG_ID}-dups.pgdump"
+        pg_dump -Fc -n nlx_bag -n nlx_update "${PGCONN}" -f dumps/"$(date +%Y%m%d.%H%M)-${BAG_ID}-dups.pgdump"
     else
         echo "  > update failed (check \`${BAG_LOG:-above}\`), terminating"
     fi
@@ -201,9 +209,9 @@ do
         ${NLX_BIN} -q ${NLX_BIN%/*}/../db/script/adres-tabel.sql > /dev/null
         ${NLX_BIN} -q ${NLX_BIN%/*}/../db/script/geocode/geocode-tabellen.sql > /dev/null
         ${NLX_BIN} -q ${NLX_BIN%/*}/../db/script/geocode/geocode-functies.sql > /dev/null
-        vacuumdb -e -z kadaster 2>&1
+        vacuumdb -e -z "${PGCONN} user=nlx_bag" 2>&1
         echo "... re-created, another dump"
-        pg_dump -Fc -n nlx_bag -n nlx_update -Ox kadaster -f dumps/"$(date +%Y%m%d.%H%M)-${BAG_ID}-de_duplicated.pgdump"
+        pg_dump -Fc -n nlx_bag -n nlx_update "${PGCONN}" -f dumps/"$(date +%Y%m%d.%H%M)-${BAG_ID}-de_duplicated.pgdump"
     fi
     # }}}
 

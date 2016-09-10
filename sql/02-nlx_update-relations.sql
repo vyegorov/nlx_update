@@ -76,3 +76,27 @@ CREATE TABLE bag_duplicate (
     CONSTRAINT f_bag_duplicate_file FOREIGN KEY (file_id) REFERENCES file
 );
 -- }}}
+-- {{{ mview
+--     Materialized views instead of tables
+CREATE TABLE mview (
+    mview_name      text        NOT NULL,
+    seq_no          int4        NOT NULL,
+    refresh_no      int4        NOT NULL,
+    refresh_type    char(1)     NOT NULL CHECK (refresh_type IN ('A', 'M')), -- Automatic, Manual
+    modify_dt       timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT p_mview PRIMARY KEY (mview_name),
+    CONSTRAINT u_refresh_seq UNIQUE (refresh_type, seq_no)
+);
+-- }}}
+-- {{{ mview_track
+CREATE TABLE mview_track (
+    mview_name      text        NOT NULL,
+    seq_no          int4        NOT NULL,
+    refresh_no      int4        NOT NULL,
+    refresh_type    char(1)     NOT NULL CHECK (refresh_type IN ('A', 'M')),
+    modify_dt       timestamptz NOT NULL,
+    operation       char(1)     CHECK (operation IN ('I','U','D')),
+    CONSTRAINT p_mview_track PRIMARY KEY (mview_name, modify_dt),
+    CONSTRAINT f_mview_track FOREIGN KEY (mview_name) REFERENCES mview
+);
+-- }}}

@@ -37,6 +37,31 @@ END;
 $t_file_track$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION t_file_track() IS $$Track changes to the `file` record. Force stats calculation if file had been uploaded$$;
 -- }}}
+-- {{{ mview triggers
+CREATE OR REPLACE FUNCTION t_mview_before() RETURNS trigger AS $t_mview_before$
+BEGIN
+    IF NEW.modify_dt IS NULL
+       OR (TG_OP='UPDATE'
+           AND OLD IS DISTINCT FROM NEW
+           AND NOT OLD.modify_dt IS DISTINCT FROM NEW.modify_dt)
+    THEN
+        NEW.modify_dt := now();
+    END IF;
+
+    RETURN NEW;
+END;
+$t_mview_before$ LANGUAGE plpgsql;
+CREATE OR REPLACE FUNCTION t_mview_track() RETURNS trigger AS $t_mview_track$
+BEGIN
+    IF TG_OP='UPDATE' AND NEW IS NOT DISTINCT FROM OLD THEN
+        RETURN NEW;
+    END IF;
+    INSERT INTO mview_track VALUES (NEW.mview_name, NEW.seq_no, NEW.refresh_no, NEW.refresh_type, NEW.modify_dt,
+        CASE WHEN TG_OP='INSERT' THEN 'I' WHEN TG_OP='UPDATE' THEN 'U' ELSE 'D' END);
+    RETURN NEW;
+END;
+$t_mview_track$ LANGUAGE plpgsql;
+-- }}}
 -- {{{ bag_stats()
 CREATE OR REPLACE FUNCTION bag_stats(in_file int4) RETURNS int AS $bag_stats$
 DECLARE
@@ -172,14 +197,14 @@ END;
 $bag_deduplicate$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION bag_deduplicate(in_file int4, in_verbose bool) IS $$Extract duplicates into a dedicated table, report back number of duplicates moved$$;
 -- }}}
--- {{{ bag_dups
+-- {{{ bag_dups()
 CREATE OR REPLACE FUNCTION bag_dups() RETURNS TABLE (table_name text, dup_count int8) AS $bag_dups$
 DECLARE
     _rec    record;
 BEGIN
     FOR _rec IN
         SELECT format($$SELECT '%s'::text, coalesce((SELECT count(*) FROM %I.%I GROUP BY %s HAVING count(*) > 1), 0)$$,
-                      v.table_name,v.schema_name,v.table_name,array_to_string(v.index_columns,',')) sql
+                      v.table_name,v.schema_name,v.table_name,array_to_string(v.index_columns,',')) AS sql
           FROM affected_tables_v v
     LOOP
         RETURN QUERY EXECUTE _rec.sql;
@@ -188,4 +213,17 @@ BEGIN
 END;
 $bag_dups$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION bag_dups() IS $$Report duplicates for all affected tables using `count(*)`$$;
+-- }}}
+-- {{{ mview_refresh()
+CREATE OR REPLACE FUNCTION mview_refresh(_mview text) RETURNS int4 AS $mview_refresh$
+DECLARE
+    _no     int4;
+BEGIN
+    UPDATE mview SET refresh_no=nextval('mview_refresh_no')
+     WHERE mview_name=_mview RETURNING refresh_no INTO _no;
+    EXECUTE format('REFRESH MATERIALIZED VIEW CONCURRENTLY $I', _mview);
+
+    RETURN _no;
+END;
+$mview_refresh$ LANGUAGE plpgsql;
 -- }}}
