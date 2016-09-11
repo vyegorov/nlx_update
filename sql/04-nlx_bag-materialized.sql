@@ -7,7 +7,7 @@
 SET search_path TO nlx_fresh,nlx_update,public;
 
 -- {{{ nummeraanduidingpostcode
-CREATE VIEW nummeraanduidingpostcode AS
+CREATE OR REPLACE VIEW nummeraanduidingpostcode AS
 SELECT gid,
        identificatie,
        aanduidingrecordinactief,
@@ -33,7 +33,7 @@ SELECT gid,
    AND nummeraanduiding.nummeraanduidingstatus <> 'Naamgeving ingetrokken'::nummeraanduidingstatus;
 -- }}}
 
--- {{{ gzoemeente
+-- {{{ gemeente
 CREATE MATERIALIZED VIEW gemeente AS
 WITH _r(no)     AS (SELECT refresh_no FROM nlx_update.mview WHERE mview_name='gemeente'),
      _g(gid,no) AS (SELECT setval('gemeente_gid',1,false), no FROM _r)
@@ -50,8 +50,7 @@ SELECT _g.no                    refresh_no, -- no of refresh
      GROUP BY gw.gemeentecode, gp.gemeentenaam
      ORDER BY gw.gemeentecode, gp.gemeentenaam, ST_Multi(ST_Union(w.geovlak))
     ) s
- CROSS JOIN _g
-WITH NO DATA;
+ CROSS JOIN _g;
 
 CREATE UNIQUE INDEX gemeente_pkey ON gemeente(gid, refresh_no);
 CREATE INDEX gemeente_geom_idx ON gemeente USING gist (geovlak);
@@ -73,8 +72,7 @@ SELECT _g.no                    refresh_no, -- no of refresh
      GROUP BY gp.provinciecode, gp.provincienaam
      ORDER BY gp.provinciecode, gp.provincienaam, ST_Multi(ST_Union(g.geovlak))
     ) s
- CROSS JOIN _g
-WITH NO DATA;
+ CROSS JOIN _g;
 
 CREATE UNIQUE INDEX provincie_pkey ON provincie(gid,refresh_no);
 CREATE INDEX provincie_geom_idx ON provincie USING gist (geovlak);
@@ -242,8 +240,7 @@ SELECT _g.no                    refresh_no, -- no of refresh
       LEFT JOIN gemeente_provincie                  p2 ON g2.gemeentecode = p2.gemeentecode
      ORDER BY 1,2,3,4,5,6,7
     ) a
- CROSS JOIN _g
-WITH NO DATA;
+ CROSS JOIN _g;
 
 CREATE UNIQUE INDEX adres_pkey ON adres(gid, refresh_no);
 CREATE INDEX adres_geom_idx ON adres USING gist (geopunt);
@@ -363,8 +360,7 @@ SELECT _g.no                    refresh_no, -- no of refresh
       JOIN gemeente_provincie                   p   ON p.gemeentecode=g.gemeentecode
      ORDER BY 1,2,3,4,5,6,7,8
     ) ga
- CROSS JOIN _g
-WITH NO DATA;
+ CROSS JOIN _g;
 
 CREATE UNIQUE INDEX geo_adres_pkey ON geo_adres(gid, refresh_no);
 CREATE INDEX geo_adres_geom ON geo_adres USING gist (geopunt);
@@ -388,8 +384,7 @@ SELECT _g.no                        refresh_no, -- no of refresh
       FROM geo_adres
      ORDER BY provincie, gemeente, woonplaats, straatnaam, postcode
     ) s
- CROSS JOIN _g
-WITH NO DATA;
+ CROSS JOIN _g;
 
 CREATE UNIQUE INDEX geo_postcode6_pkey ON geo_postcode6(gid, refresh_no);
 CREATE INDEX geo_postcode6_postcode ON geo_postcode6(postcode);
@@ -415,8 +410,7 @@ SELECT _g.no                        refresh_no, -- no of refresh
       FROM geo_postcode6
      ORDER BY provincie, gemeente, woonplaats
     ) s
- CROSS JOIN _g
-WITH NO DATA;
+ CROSS JOIN _g;
 
 CREATE UNIQUE INDEX geo_postcode4_pkey ON geo_postcode4(gid, refresh_no);
 CREATE INDEX geo_postcode4_postcode ON geo_postcode4(postcode);
@@ -441,8 +435,7 @@ SELECT _g.no                            refresh_no, -- no of refresh
       FROM geo_postcode6
      ORDER BY provincie, gemeente, woonplaats, straatnaam
     ) s
- CROSS JOIN _g
-WITH NO DATA;
+ CROSS JOIN _g;
 
 CREATE UNIQUE INDEX geo_straatnaam_pkey ON geo_straatnaam(gid, refresh_no);
 CREATE INDEX geo_straatnaam_straatnaam ON geo_straatnaam(straatnaam);
@@ -467,8 +460,7 @@ SELECT _g.no                            refresh_no, -- no of refresh
       JOIN gemeente_provincie                 p ON p.gemeentecode=g.gemeentecode
      ORDER BY 1, 2, 3
     ) s
- CROSS JOIN _g
-WITH NO DATA;
+ CROSS JOIN _g;
 
 CREATE UNIQUE INDEX geo_woonplaats_pkey ON geo_woonplaats(gid, refresh_no);
 CREATE INDEX geo_woonplaats_sdx ON geo_woonplaats USING gist (geopunt);
@@ -490,8 +482,7 @@ SELECT _g.no                            refresh_no, -- no of refresh
       JOIN gemeente_provincie p ON p.gemeentecode=g.gemeentecode
      ORDER BY 1,2
     ) s
- CROSS JOIN _g
-WITH NO DATA;
+ CROSS JOIN _g;
 
 CREATE UNIQUE INDEX geo_gemeente_pkey ON geo_gemeente(gid, refresh_no);
 CREATE INDEX geo_gemeente_geopunt ON geo_gemeente USING gist (geopunt);
@@ -510,8 +501,7 @@ SELECT _g.no                        refresh_no, -- no of refresh
       FROM provincie p
      ORDER BY 1,2
     ) s
- CROSS JOIN _g
-WITH NO DATA;
+ CROSS JOIN _g;
 
 CREATE UNIQUE INDEX geo_provincie_pkey ON geo_provincie(gid, refresh_no);
 CREATE INDEX geo_provincie_geopunt ON geo_provincie USING gist (geopunt);
