@@ -218,12 +218,33 @@ COMMENT ON FUNCTION bag_dups() IS $$Report duplicates for all affected tables us
 CREATE OR REPLACE FUNCTION mview_refresh(_mview text) RETURNS int4 AS $mview_refresh$
 DECLARE
     _no     int4;
+    _out    text;
 BEGIN
+    SHOW search_path INTO _out;
+    RAISE NOTICE 'search_path: %', _out;
     UPDATE mview SET refresh_no=nextval('mview_refresh_no')
      WHERE mview_name=_mview RETURNING refresh_no INTO _no;
-    EXECUTE format('REFRESH MATERIALIZED VIEW CONCURRENTLY $I', _mview);
+    EXECUTE format('REFRESH MATERIALIZED VIEW CONCURRENTLY %I', _mview);
 
     RETURN _no;
 END;
-$mview_refresh$ LANGUAGE plpgsql;
+$mview_refresh$ LANGUAGE plpgsql SET search_path TO nlx_fresh,nlx_update,public;
+-- }}}
+-- {{{ mview_auto_refresh()
+CREATE OR REPLACE FUNCTION mview_auto_refresh() RETURNS int4 AS $mview_auto_refresh$
+DECLARE
+    _rec    record;
+    _cnt    int4 DEFAULT 0;
+BEGIN
+    FOR _rec IN
+        SELECT * FROM mview WHERE refresh_type='A' ORDER BY seq_no
+    LOOP
+        EXECUTE mview_refresh(_rec.mview_name);
+        RAISE NOTICE '`%` refreshed', _rec.mview_name;
+        _cnt = _cnt + 1;
+    END LOOP;
+
+    RETURN _cnt;
+END;
+$mview_auto_refresh$ LANGUAGE plpgsql;
 -- }}}

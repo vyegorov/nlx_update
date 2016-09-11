@@ -204,11 +204,8 @@ do
     # }}}
     # {{{ refresh dependent tables
     if [ $RET -eq 0 ] && [ "${A_GEMEENTE:-no}" = "yes" ]; then
-        echo "... de-duplicated, re-creation of \`gemeente\` and \`adres\` tables"
-        ${NLX_BIN} -q ${NLX_BIN%/*}/../db/script/gemeente-provincie-tabel.sql > /dev/null
-        ${NLX_BIN} -q ${NLX_BIN%/*}/../db/script/adres-tabel.sql > /dev/null
-        ${NLX_BIN} -q ${NLX_BIN%/*}/../db/script/geocode/geocode-tabellen.sql > /dev/null
-        ${NLX_BIN} -q ${NLX_BIN%/*}/../db/script/geocode/geocode-functies.sql > /dev/null
+        echo "... de-duplicated, refreshing materialized views"
+        dosql "SELECT '  + refreshed '||mview_auto_refresh()||' views';"
         vacuumdb -e -z "${PGCONN} user=nlx_bag" 2>&1
         echo "... re-created, another dump"
         pg_dump -Fc -n nlx_bag -n nlx_update "${PGCONN}" -f dumps/"$(date +%Y%m%d.%H%M)-${BAG_ID}-de_duplicated.pgdump"

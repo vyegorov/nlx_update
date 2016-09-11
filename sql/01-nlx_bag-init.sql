@@ -13,20 +13,6 @@
 CREATE ROLE nlx_update LOGIN;
 CREATE SCHEMA AUTHORIZATION nlx_update;
 
-GRANT USAGE ON SCHEMA nlx_bag TO nlx_update;
-SELECT format($$GRANT ALL ON TABLE %I.%I TO nlx_update;$$, n.nspname, tc.relname)
-  FROM pg_class tc
-  JOIN pg_namespace n ON n.oid=tc.relnamespace AND n.nspname='nlx_bag'
- WHERE tc.relkind='r'
-   AND EXISTS (SELECT 1 FROM pg_attribute at
-                WHERE attrelid=tc.oid AND attnum>0 AND NOT attisdropped
-                  AND attname='gid')
-   AND EXISTS ( /* table should have PK on `gid` column */
-    SELECT 1
-      FROM pg_index     i1
-      JOIN pg_attribute a1 ON a1.attrelid=i1.indexrelid AND a1.attname='gid'
-     WHERE i1.indrelid=tc.oid AND i1.indisprimary);
-
 CREATE SEQUENCE mview_refresh_no;
 GRANT USAGE ON SEQUENCE mview_refresh_no TO nlx_update;
 CREATE SEQUENCE gemeente_gid;
@@ -49,3 +35,19 @@ CREATE SEQUENCE geo_gemeente_gid;
 GRANT USAGE ON SEQUENCE geo_gemeente_gid TO nlx_update;
 CREATE SEQUENCE geo_provincie_gid;
 GRANT USAGE ON SEQUENCE geo_provincie_gid TO nlx_update;
+
+-- Keep these the last ones, to make sure
+-- produced GRANT commands are not missed
+GRANT USAGE ON SCHEMA nlx_bag TO nlx_update;
+SELECT format($$GRANT ALL ON TABLE %I.%I TO nlx_update;$$, n.nspname, tc.relname)
+  FROM pg_class tc
+  JOIN pg_namespace n ON n.oid=tc.relnamespace AND n.nspname='nlx_bag'
+ WHERE tc.relkind='r'
+   AND EXISTS (SELECT 1 FROM pg_attribute at
+                WHERE attrelid=tc.oid AND attnum>0 AND NOT attisdropped
+                  AND attname='gid')
+   AND EXISTS ( /* table should have PK on `gid` column */
+    SELECT 1
+      FROM pg_index     i1
+      JOIN pg_attribute a1 ON a1.attrelid=i1.indexrelid AND a1.attname='gid'
+     WHERE i1.indrelid=tc.oid AND i1.indisprimary);

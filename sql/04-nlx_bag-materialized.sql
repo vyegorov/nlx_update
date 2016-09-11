@@ -1,8 +1,10 @@
 /*
  *  NLX Update views
  *
- *  Should be executed as BAG schema owner after `02-relations.sql`.
+ *  Should be executed as NLX Updated owner after `03-relations.sql`.
  */
+
+SET search_path TO nlx_fresh,nlx_update,public;
 
 -- {{{ nummeraanduidingpostcode
 CREATE VIEW nummeraanduidingpostcode AS
@@ -515,7 +517,9 @@ CREATE UNIQUE INDEX geo_provincie_pkey ON geo_provincie(gid, refresh_no);
 CREATE INDEX geo_provincie_geopunt ON geo_provincie USING gist (geopunt);
 -- }}}
 
-INSERT INTO nlx_update.mview VALUES
+RESET search_path;
+
+INSERT INTO mview VALUES
   ('gemeente', 1, 0, 'A', now()),
   ('provincie', 2, 0, 'A', now()),
   ('adres', 3, 0, 'A', now()),

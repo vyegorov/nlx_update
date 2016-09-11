@@ -4,13 +4,8 @@
  *  Use this script to get rid of `nlx_update` schema.
  *  Same assumptions as for `01-init.sql` applies.
  */
-REVOKE DELETE ON ligplaats FROM nlx_update;
-REVOKE DELETE ON standplaats FROM nlx_update;
-REVOKE DELETE ON verblijfsobject FROM nlx_update;
-REVOKE DELETE ON pand FROM nlx_update;
-REVOKE DELETE ON nummeraanduiding FROM nlx_update;
-REVOKE DELETE ON openbareruimte FROM nlx_update;
-REVOKE DELETE ON woonplaats FROM nlx_update;
+REVOKE ALL ON ALL TABLES IN SCHEMA nlx_bag FROM nlx_update;
+REVOKE USAGE ON SCHEMA nlx_bag FROM nlx_update;
 DROP SEQUENCE mview_refresh_no;
 DROP SEQUENCE gemeente_gid;
 DROP SEQUENCE provincie_gid;
