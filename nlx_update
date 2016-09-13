@@ -11,7 +11,7 @@ echo $$ > "${SELFPIDFILE}"; sync
 A_SELF=${0##*/}
 A_DEBUG="no"
 A_SEND="yes"
-A_GEMEENTE="yes"
+A_MV="yes"
 BAG_DIR=${PG_BASE}/var/bag
 TMP_DIR=${PG_BASE}/tmp/dir$$.tmp
 PSQL_RC=${PG_BASE}/tmp/psql$$.ret
@@ -23,7 +23,7 @@ NLX_BIN="/opt/postgres/nlx/rel/bag/bin/bag-extract.sh"
 if [ 1 -eq 0 ]; then
     LOG_DIR=${PG_BASE}/tmp/
     NLX_BIN="/Users/viy/prj/ecofys/nlx/bag/bin/bag-extract.sh"
-    unset A_GEMEENTE
+    unset A_MV
 fi
 
 while [ "$#" -gt 0 ]; do
@@ -32,8 +32,8 @@ while [ "$#" -gt 0 ]; do
             A_DEBUG="${1##*=}" ;;
         nosend)
             unset A_SEND ;;
-        nogemeente)
-            unset A_GEMEENTE ;;
+        nomv)
+            unset A_MV ;;
         *) echo "! Ignoring parameter \"$1\"";;
     esac
     shift
@@ -203,11 +203,11 @@ do
     fi
     # }}}
     # {{{ refresh dependent tables
-    if [ $RET -eq 0 ] && [ "${A_GEMEENTE:-no}" = "yes" ]; then
+    if [ $RET -eq 0 ] && [ "${A_MV:-no}" = "yes" ]; then
         echo "... de-duplicated, refreshing materialized views"
         dosql "SELECT '  + refreshed '||mview_auto_refresh()||' views';"
         vacuumdb -e -z "${PGCONN} user=nlx_bag" 2>&1
-        echo "... re-created, another dump"
+        echo "... refreshed, another dump"
         pg_dump -Fc -n nlx_bag -n nlx_update "${PGCONN}" -f dumps/"$(date +%Y%m%d.%H%M)-${BAG_ID}-de_duplicated.pgdump"
     fi
     # }}}
